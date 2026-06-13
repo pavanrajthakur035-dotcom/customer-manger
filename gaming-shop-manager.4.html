@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameZone Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#0a0b12; --surface:#12141f; --surface2:#1a1d2e; --surface3:#22263a;
+    --accent:#7c3aed; --accent2:#a855f7; --neon:#c084fc;
+    --green:#10b981; --red:#ef4444; --yellow:#f59e0b; --blue:#3b82f6;
+    --text:#e2e8f0; --muted:#64748b; --border:#2d3154;
+    --glow:0 0 20px rgba(124,58,237,0.4);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(124,58,237,.15) 0%,transparent 70%);pointer-events:none;z-index:0;}
+  .screen{display:none;min-height:100vh;position:relative;z-index:1;}
+  .screen.active{display:flex;}
+
+  /* LOGIN */
+  #loginScreen{align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0b12 0%,#12092a 100%);}
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:48px 40px;width:420px;box-shadow:var(--glow),0 20px 60px rgba(0,0,0,.5);}
+  .logo{text-align:center;margin-bottom:32px;}
+  .logo-icon{font-size:48px;display:block;margin-bottom:8px;filter:drop-shadow(0 0 12px var(--accent));}
+  .logo h1{font-family:'Orbitron',monospace;font-size:22px;color:var(--neon);letter-spacing:3px;}
+  .logo p{color:var(--muted);font-size:13px;margin-top:4px;}
+  .input-group{margin-bottom:20px;}
+  .input-group label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;}
+  .input-group input{width:100%;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;outline:none;transition:border .2s;}
+  .input-group input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,58,237,.15);}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;}
+  .btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.5px;}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,58,237,.5);}
+  .error-msg{color:var(--red);font-size:13px;margin-top:12px;text-align:center;min-height:20px;}
+
+  /* LAYOUT */
+  #appScreen{flex-direction:row;}
+  .sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:24px 0;position:sticky;top:0;height:100vh;flex-shrink:0;}
+  .sidebar-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);}
+  .sidebar-logo span{font-family:'Orbitron',monospace;font-size:14px;color:var(--neon);letter-spacing:2px;}
+  .sidebar-logo p{font-size:11px;color:var(--muted);margin-top:2px;}
+  .nav{padding:16px 12px;flex:1;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;cursor:pointer;transition:all .2s;font-size:14px;color:var(--muted);margin-bottom:4px;border:none;background:none;width:100%;text-align:left;}
+  .nav-item:hover{background:var(--surface2);color:var(--text);}
+  .nav-item.active{background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(168,85,247,.15));color:var(--neon);border:1px solid rgba(124,58,237,.3);}
+  .nav-icon{font-size:18px;}
+  .sidebar-bottom{padding:16px 20px;border-top:1px solid var(--border);}
+  .owner-badge{display:flex;align-items:center;gap:10px;}
+  .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;}
+  .owner-info span{font-size:13px;font-weight:500;}
+  .owner-info p{font-size:11px;color:var(--muted);}
+  .logout-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;margin-left:auto;}
+  .logout-btn:hover{color:var(--red);}
+  .main{flex:1;overflow-y:auto;padding:28px 32px;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .page-header{margin-bottom:28px;}
+  .page-header h2{font-family:'Orbitron',monospace;font-size:20px;color:var(--neon);letter-spacing:1px;}
+  .page-header p{color:var(--muted);font-size:13px;margin-top:4px;}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;}
+  .card-sm{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+
+  /* STAT CARDS — clickable */
+  .stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;cursor:default;}
+  .stat-card.clickable{cursor:pointer;transition:all .2s;}
+  .stat-card.clickable:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,58,237,.2);}
+  .stat-card.clickable:hover .click-hint{opacity:1;}
+  .stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad,linear-gradient(90deg,var(--accent),var(--accent2)));}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .stat-value{font-family:'Orbitron',monospace;font-size:26px;margin:8px 0 4px;}
+  .stat-sub{font-size:12px;color:var(--muted);}
+  .stat-icon{position:absolute;top:16px;right:16px;font-size:28px;opacity:.3;}
+  .click-hint{position:absolute;bottom:10px;right:12px;font-size:10px;color:var(--accent2);opacity:0;transition:opacity .2s;font-weight:600;}
+
+  /* FORMS */
+  .form-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;}
+  .form-group{flex:1;min-width:150px;}
+  .form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .form-group input,.form-group select{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;transition:border .2s;}
+  .form-group input:focus,.form-group select:focus{border-color:var(--accent);}
+  .form-group select option{background:var(--surface2);}
+  .btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s;}
+  .btn-accent{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .btn-accent:hover{opacity:.9;transform:translateY(-1px);}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-green:hover{opacity:.9;}
+  .btn-red{background:var(--red);color:#fff;}
+  .btn-yellow{background:var(--yellow);color:#000;}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+  .btn-outline:hover{border-color:var(--accent);color:var(--neon);}
+
+  /* TABLE */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
+  td{padding:12px 14px;font-size:14px;border-bottom:1px solid rgba(45,49,84,.5);}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(124,58,237,.05);}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+  .badge-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);}
+  .badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.3);}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+  .badge-blue{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);}
+  .badge-purple{background:rgba(124,58,237,.15);color:var(--neon);border:1px solid rgba(124,58,237,.3);}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--surface);border:1px solid var(--green);border-radius:12px;padding:14px 20px;font-size:14px;color:var(--green);box-shadow:0 8px 32px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .3s;}
+  .toast.show{transform:translateY(0);opacity:1;}
+
+  /* TIMER BAR */
+  .timer-bar{height:4px;border-radius:2px;background:var(--border);margin-top:8px;overflow:hidden;}
+  .timer-fill{height:100%;border-radius:2px;transition:width 1s linear;}
+  .section-title{font-size:13px;font-weight:600;color:var(--neon);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  /* MODALS */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+  .modal h3{font-family:'Orbitron',monospace;font-size:16px;color:var(--neon);margin-bottom:20px;}
+  .modal-actions{display:flex;gap:10px;margin-top:24px;}
+
+  /* BIG DATA MODAL */
+  .big-modal{width:800px;max-width:96vw;}
+  .modal-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .mscard{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+  .mscard .mv{font-family:'Orbitron',monospace;font-size:20px;margin-top:4px;}
+  .mscard .ml{font-size:11px;color:var(--muted);text-transform:uppercase;}
+
+  /* SESSION CARD */
+  .session-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;}
+  .session-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;}
+  .session-info{flex:1;}
+  .session-info h4{font-size:15px;font-weight:600;}
+  .session-info p{font-size:12px;color:var(--muted);margin-top:2px;}
+  .session-time{text-align:right;flex-shrink:0;}
+  .session-time .time{font-family:'Orbitron',monospace;font-size:20px;color:var(--neon);}
+  .session-time .cost{font-size:12px;color:var(--green);margin-top:2px;}
+  .session-actions{display:flex;gap:8px;margin-top:8px;}
+
+  /* PRICING TIER */
+  .pricing-tier{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;}
+  .tier-name{font-size:15px;font-weight:600;}
+  .tier-rate{font-family:'Orbitron',monospace;font-size:18px;color:var(--green);}
+  .tier-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  /* RECORD SHEET */
+  .record-row-entry{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:10px;}
+  .price-calc-box{background:var(--surface3);border:1px solid var(--accent);border-radius:10px;padding:16px;margin-top:12px;}
+  .price-line{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(45,49,84,.4);}
+  .price-line:last-child{border-bottom:none;font-weight:700;font-size:15px;color:var(--green);}
+
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--accent);}
+  @media(max-width:900px){.sidebar{display:none;}.main{padding:20px;}.grid-4{grid-template-columns:1fr 1fr;}}
+  @media(max-width:600px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+
+  /* FORGOT PASSWORD / ACCOUNT MODALS */
+  .login-link{text-align:center;margin-top:14px;}
+  .login-link a{color:var(--accent2);font-size:13px;cursor:pointer;text-decoration:none;}
+  .login-link a:hover{color:var(--neon);text-decoration:underline;}
+  .forgot-card{display:none;margin-top:16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .forgot-card.open{display:block;}
+
+  /* REFRESH BUTTON */
+  .refresh-btn{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(99,160,255,.1));border:1px solid rgba(59,130,246,.35);color:var(--blue);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+  .refresh-btn:hover{background:rgba(59,130,246,.3);transform:translateY(-1px);box-shadow:0 4px 12px rgba(59,130,246,.25);}
+  .refresh-btn.spinning .ri{animation:spin .6s linear;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* PAYMENT STATUS BADGE */
+  .badge-unpaid{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+  .payment-status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}
+  .dot-paid{background:var(--green);}
+  .dot-unpaid{background:var(--red);animation:pulse-dot 1.2s ease-in-out infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* MONTHLY SUMMARY BANNER */
+  .monthly-banner{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(251,191,36,.06));border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .mb-title{font-size:11px;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+  .mb-value{font-family:'Orbitron',monospace;font-size:22px;color:var(--yellow);}
+  .mb-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .mb-breakdown{display:flex;gap:20px;flex-wrap:wrap;}
+  .mb-item{text-align:center;}
+
+  /* PAYMENT CHECK ALERT */
+  .pay-alert{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .pay-alert-info{font-size:13px;}
+  .pay-alert-info b{color:var(--red);}
+  .pay-alert-info span{color:var(--muted);}
+
+  /* ACCOUNT SETTINGS IN SIDEBAR */
+  .settings-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;transition:all .2s;}
+  .settings-btn:hover{background:var(--surface2);color:var(--neon);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="screen active">
+  <div class="login-card">
+    <div class="logo">
+      <span class="logo-icon">🎮</span>
+      <h1>GAMEZONE</h1>
+      <p>Gaming Shop Management System</p>
+    </div>
+    <div class="input-group">
+      <label>Owner Username</label>
+      <input type="text" id="loginUser" placeholder="admin" autocomplete="off">
+    </div>
+    <div class="input-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••">
+      <div class="hint">Default: admin / admin123</div>
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Sign In →</button>
+    <div class="error-msg" id="loginErr"></div>
+    <div class="login-link"><a onclick="toggleForgot()">🔑 Forgot Password / Update Username?</a></div>
+
+    <!-- Forgot Password panel -->
+    <div class="forgot-card" id="forgotCard">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">🔐 Reset / Update Credentials</div>
+      <div class="input-group">
+        <label>Current Username</label>
+        <input type="text" id="fp-oldUser" placeholder="Current username">
+      </div>
+      <div class="input-group">
+        <label>Current Password</label>
+        <input type="password" id="fp-oldPass" placeholder="Current password">
+      </div>
+      <div style="height:1px;background:var(--border);margin:4px 0 16px;"></div>
+      <div class="input-group">
+        <label>New Username <span style="color:var(--muted);font-size:10px">(optional — leave blank to keep same)</span></label>
+        <input type="text" id="fp-newUser" placeholder="New username (optional)">
+      </div>
+      <div class="input-group">
+        <label>New Password</label>
+        <input type="password" id="fp-newPass" placeholder="New password">
+      </div>
+      <div class="input-group" style="margin-bottom:12px;">
+        <label>Confirm New Password</label>
+        <input type="password" id="fp-confirmPass" placeholder="Confirm new password">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1;padding:11px;" onclick="doResetCredentials()">✓ Update</button>
+        <button style="flex:0 0 auto;padding:11px 18px;background:var(--surface3);border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:pointer;" onclick="toggleForgot()">Cancel</button>
+      </div>
+      <div class="error-msg" id="fpErr" style="min-height:16px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen" class="screen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🎮 GAMEZONE</span>
+      <p>Manager Pro</p>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="gotoPage('dashboard',this)"><span class="nav-icon">📊</span> Dashboard</button>
+      <button class="nav-item" onclick="gotoPage('sessions',this)"><span class="nav-icon">🕹️</span> Active Sessions</button>
+      <button class="nav-item" onclick="gotoPage('pricing',this)"><span class="nav-icon">💰</span> Pricing Setup</button>
+      <button class="nav-item" onclick="gotoPage('record',this)"><span class="nav-icon">📝</span> Record Sheet</button>
+      <button class="nav-item" onclick="gotoPage('history',this)"><span class="nav-icon">📋</span> Session History</button>
+      <button class="nav-item" onclick="gotoPage('earnings',this)"><span class="nav-icon">📈</span> Earnings Report</button>
+      <button class="nav-item" onclick="gotoPage('export',this)"><span class="nav-icon">📤</span> Export Data</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="owner-badge">
+        <div class="avatar" id="ownerAvatar">O</div>
+        <div class="owner-info"><span id="ownerName">Owner</span><p>Administrator</p></div>
+        <button class="settings-btn" onclick="openAccountSettings()" title="Account Settings">⚙</button>
+        <button class="logout-btn" onclick="doLogout()" title="Logout">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2>DASHBOARD</h2>
+          <p>Live overview of your gaming shop · <span id="dash-last-refresh" style="color:var(--accent2)"></span></p>
+        </div>
+        <button class="refresh-btn" onclick="dashRefresh(this)" title="Refresh dashboard data">
+          <span class="ri" style="display:inline-block;font-style:normal;">🔄</span> Refresh
+        </button>
+      </div>
+
+      <!-- Monthly Earnings Banner -->
+      <div class="monthly-banner" id="monthly-banner">
+        <div>
+          <div class="mb-title">📅 Monthly Earnings Overview</div>
+          <div class="mb-value" id="mb-total">₹0</div>
+          <div class="mb-sub" id="mb-month-label">Loading…</div>
+        </div>
+        <div class="mb-breakdown">
+          <div class="mb-item"><div style="font-size:10px;color:var(--muted)">SESSIONS</div><div style="font-family:'Orbitron',monospace;font-size:16px;" id="mb-sessions">0</div></div>
+          <div class="mb-item"><div style="font-size:10px;color:var(--muted)">CASH</div><div style="font-family:'Orbitron',monospace;font-size:16px;color:var(--yellow);" id="mb-cash">₹0</div></div>
+          <div class="mb-item"><div style="font-size:10px;color:var(--muted)">UPI/CARD</div><div style="font-family:'Orbitron',monospace;font-size:16px;color:var(--blue);" id="mb-upi">₹0</div></div>
+          <div class="mb-item"><div style="font-size:10px;color:var(--muted)">AVG/SESSION</div><div style="font-family:'Orbitron',monospace;font-size:16px;" id="mb-avg">₹0</div></div>
+          <div class="mb-item" style="border-left:1px solid rgba(245,158,11,.3);padding-left:20px;"><div style="font-size:10px;color:var(--blue)">TODAY'S CUSTOMERS</div><div style="font-family:'Orbitron',monospace;font-size:16px;color:var(--blue);" id="mb-today-cust">0</div></div>
+          <div class="mb-item"><div style="font-size:10px;color:var(--muted)">MONTH UNIQUE</div><div style="font-family:'Orbitron',monospace;font-size:16px;" id="mb-month-cust">0</div></div>
+        </div>
+        <button class="btn btn-outline" style="font-size:12px;padding:7px 14px;" onclick="openEarnModal('month')">View Details →</button>
+      </div>
+      <!-- Daily Customer Count (auto-updated) -->
+      <div id="mb-daily-customers-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;">👥 Daily Customer Count — This Month</div>
+        <div id="mb-daily-customers-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
+      <!-- Unpaid / Payment Check Alerts -->
+      <div id="payment-alerts-box" style="margin-bottom:20px;display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.8px;">⚠ Payment Pending — Hours Complete</div>
+          <button class="btn btn-outline" style="font-size:12px;padding:5px 12px;" onclick="openPayCheckModal()">💳 View All Pending</button>
+        </div>
+        <div id="payment-alerts-list"></div>
+      </div>
+      <div class="grid-4" style="margin-bottom:24px">
+        <div class="stat-card" style="--grad:linear-gradient(90deg,#7c3aed,#a855f7)">
+          <div class="stat-icon">🕹️</div>
+          <div class="stat-label">Active Now</div>
+          <div class="stat-value" id="s-active">0</div>
+          <div class="stat-sub">Sessions running</div>
+        </div>
+        <div class="stat-card clickable" style="--grad:linear-gradient(90deg,#10b981,#34d399)" onclick="openEarnModal('today')">
+          <div class="stat-icon">💰</div>
+          <div class="stat-label">Today's Earning</div>
+          <div class="stat-value" id="s-today">₹0</div>
+          <div class="stat-sub" id="s-today-count">0 sessions</div>
+          <div class="click-hint">👆 View Details</div>
+        </div>
+        <div class="stat-card clickable" style="--grad:linear-gradient(90deg,#f59e0b,#fbbf24)" onclick="openEarnModal('month')">
+          <div class="stat-icon">📅</div>
+          <div class="stat-label">This Month</div>
+          <div class="stat-value" id="s-month">₹0</div>
+          <div class="stat-sub" id="s-month-count">0 sessions</div>
+          <div class="click-hint">👆 View Details</div>
+        </div>
+        <div class="stat-card" style="--grad:linear-gradient(90deg,#3b82f6,#60a5fa)">
+          <div class="stat-icon">👥</div>
+          <div class="stat-label">Today's Customers</div>
+          <div class="stat-value" id="s-customers">0</div>
+          <div class="stat-sub" id="s-customers-sub">0 this month</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:24px">
+        <div class="section-title">⚡ Quick Start Session</div>
+        <div class="form-row">
+          <div class="form-group"><label>Customer Name *</label><input type="text" id="qs-name" placeholder="Enter name"></div>
+          <div class="form-group"><label>Phone (optional)</label><input type="text" id="qs-phone" placeholder="10-digit number"></div>
+          <div class="form-group"><label>Pricing Plan *</label><select id="qs-plan"></select></div>
+          <div class="form-group"><label>Station</label><input type="text" id="qs-station" placeholder="e.g. PC-1, PS5-2"></div>
+          <button class="btn btn-accent" onclick="startSession()" style="margin-bottom:0">▶ Start</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">🟢 Live Sessions</div>
+        <div id="dash-sessions"><p style="color:var(--muted);font-size:14px;text-align:center;padding:20px">No active sessions. Start one above!</p></div>
+      </div>
+    </div>
+
+    <!-- ACTIVE SESSIONS -->
+    <div id="page-sessions" class="page">
+      <div class="page-header"><h2>ACTIVE SESSIONS</h2><p>Monitor and manage all running sessions</p></div>
+      <div class="card"><div id="sessions-list"><p style="color:var(--muted);font-size:14px;text-align:center;padding:32px">No active sessions right now.</p></div></div>
+    </div>
+
+    <!-- PRICING SETUP -->
+    <div id="page-pricing" class="page">
+      <div class="page-header"><h2>PRICING SETUP</h2><p>Configure plans, rates, and time slots</p></div>
+      <div class="grid-2" style="gap:24px">
+        <div class="card">
+          <div class="section-title">➕ Add Pricing Plan</div>
+          <div class="form-group" style="margin-bottom:14px"><label>Plan Name *</label><input type="text" id="p-name" placeholder="e.g. Standard Hour, VIP Session"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Base Duration (hrs) *</label><input type="number" id="p-dur" placeholder="1" min="0.5" step="0.5" value="1"></div>
+            <div class="form-group"><label>Base Price (₹) *</label><input type="number" id="p-price" placeholder="30" min="1"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Extra Rate /hr (₹)</label><input type="number" id="p-extra" placeholder="25" min="0"></div>
+            <div class="form-group"><label>Category</label>
+              <select id="p-cat"><option>PC Gaming</option><option>Console (PS/Xbox)</option><option>VR Gaming</option><option>Racing Sim</option><option>Other</option></select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:16px"><label>Description</label><input type="text" id="p-desc" placeholder="Brief description of this plan"></div>
+          <button class="btn btn-accent" onclick="addPlan()" style="width:100%">Save Plan</button>
+        </div>
+        <div class="card">
+          <div class="section-title">📋 Current Plans</div>
+          <div id="plans-list"><p style="color:var(--muted);font-size:13px">No plans yet. Add one.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECORD SHEET -->
+    <div id="page-record" class="page">
+      <div class="page-header"><h2>RECORD SHEET</h2><p>Manually log customer sessions and auto-calculate prices</p></div>
+
+      <!-- Entry Form -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="section-title">📝 Add New Record</div>
+        <div class="form-row">
+          <div class="form-group"><label>Customer Name *</label><input type="text" id="rc-name" placeholder="Full name"></div>
+          <div class="form-group"><label>Phone</label><input type="text" id="rc-phone" placeholder="Mobile number"></div>
+          <div class="form-group"><label>Station</label><input type="text" id="rc-station" placeholder="PC-1 / PS5-1"></div>
+          <div class="form-group"><label>Date</label><input type="date" id="rc-date"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Pricing Plan *</label><select id="rc-plan" onchange="rcCalc()"></select></div>
+          <div class="form-group"><label>Start Time *</label><input type="time" id="rc-start" onchange="rcCalc()"></div>
+          <div class="form-group"><label>End Time *</label><input type="time" id="rc-end" onchange="rcCalc()"></div>
+          <div class="form-group"><label>Payment Mode</label>
+            <select id="rc-pay"><option>Cash</option><option>UPI</option><option>Card</option><option>Online</option></select>
+          </div>
+          <div class="form-group"><label>Payment Status</label>
+            <select id="rc-paid-status"><option value="paid">✅ Paid</option><option value="unpaid">❌ Unpaid</option></select>
+          </div>
+        </div>
+
+        <!-- Auto Price Calculator -->
+        <div class="price-calc-box" id="rc-calc-box" style="display:none">
+          <div class="section-title" style="margin-bottom:12px">💰 Price Calculation</div>
+          <div class="price-line"><span>Base Plan</span><span id="rc-c-plan">—</span></div>
+          <div class="price-line"><span>Base Duration</span><span id="rc-c-dur">—</span></div>
+          <div class="price-line"><span>Actual Duration</span><span id="rc-c-actual">—</span></div>
+          <div class="price-line"><span>Overtime</span><span id="rc-c-over">—</span></div>
+          <div class="price-line"><span>Overtime Charge</span><span id="rc-c-overcharge">—</span></div>
+          <div class="price-line"><span>Total Amount</span><span id="rc-c-total" style="color:var(--green)">₹0</span></div>
+        </div>
+
+        <div class="form-row" style="margin-top:16px">
+          <div class="form-group"><label>Notes / Remarks</label><input type="text" id="rc-notes" placeholder="Optional notes..."></div>
+          <button class="btn btn-accent" onclick="addRecord()" style="margin-bottom:0;padding:10px 28px">✚ Add Record</button>
+          <button class="btn btn-outline" onclick="rcReset()" style="margin-bottom:0">Clear</button>
+        </div>
+      </div>
+
+      <!-- Record Table -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+          <div class="section-title" style="margin-bottom:0;flex:1">📋 All Records</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <input type="date" id="rf-date" style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none" onchange="filterRecords()">
+            <input type="text" id="rf-search" placeholder="Search name..." style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;width:150px" oninput="filterRecords()">
+            <button class="btn btn-green" style="padding:8px 16px;font-size:13px" onclick="exportRecords()">⬇ Export</button>
+          </div>
+        </div>
+
+        <!-- Totals Bar -->
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+          <div><span style="font-size:11px;color:var(--muted)">RECORDS SHOWN</span><div style="font-family:'Orbitron',monospace;font-size:18px" id="rec-count">0</div></div>
+          <div style="width:1px;background:var(--border)"></div>
+          <div><span style="font-size:11px;color:var(--muted)">TOTAL HOURS</span><div style="font-family:'Orbitron',monospace;font-size:18px" id="rec-hrs">0h</div></div>
+          <div style="width:1px;background:var(--border)"></div>
+          <div><span style="font-size:11px;color:var(--muted)">TOTAL EARNED</span><div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--green)" id="rec-total">₹0</div></div>
+          <div style="width:1px;background:var(--border)"></div>
+          <div><span style="font-size:11px;color:var(--muted)">CASH</span><div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--yellow)" id="rec-cash">₹0</div></div>
+          <div><span style="font-size:11px;color:var(--muted)">UPI/CARD</span><div style="font-family:'Orbitron',monospace;font-size:18px;color:var(--blue)" id="rec-upi">₹0</div></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Date</th><th>Customer</th><th>Phone</th><th>Station</th>
+                <th>Plan</th><th>Start</th><th>End</th><th>Duration</th>
+                <th>Base ₹</th><th>Extra ₹</th><th>Total ₹</th><th>Payment</th><th>Paid?</th><th>Notes</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="record-tbody"></tbody>
+          </table>
+          <p id="record-empty" style="color:var(--muted);text-align:center;padding:32px;display:none">No records yet. Add one above.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="page-history" class="page">
+      <div class="page-header"><h2>SESSION HISTORY</h2><p>All completed sessions from live tracking</p></div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="form-row">
+          <div class="form-group"><label>Filter by Date</label><input type="date" id="h-date"></div>
+          <div class="form-group"><label>Search Customer</label><input type="text" id="h-search" placeholder="Name or phone..." oninput="filterHistory()"></div>
+          <button class="btn btn-outline" onclick="filterHistory()">🔍 Filter</button>
+          <button class="btn btn-outline" onclick="clearFilter()">✕ Clear</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Customer</th><th>Phone</th><th>Station</th><th>Plan</th><th>Start</th><th>End</th><th>Duration</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+          <p id="history-empty" style="color:var(--muted);text-align:center;padding:24px;display:none">No records found.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- EARNINGS -->
+    <div id="page-earnings" class="page">
+      <div class="page-header"><h2>EARNINGS REPORT</h2><p>Detailed financial analysis by period</p></div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="form-row">
+          <div class="form-group"><label>From Date</label><input type="date" id="e-from"></div>
+          <div class="form-group"><label>To Date</label><input type="date" id="e-to"></div>
+          <button class="btn btn-accent" onclick="calcEarnings()">📊 Calculate</button>
+          <button class="btn btn-outline" onclick="setToday()">Today</button>
+          <button class="btn btn-outline" onclick="setThisMonth()">This Month</button>
+        </div>
+      </div>
+      <div class="grid-4" style="margin-bottom:24px">
+        <div class="stat-card"><div class="stat-label">Total Revenue</div><div class="stat-value" id="e-total">₹0</div></div>
+        <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value" id="e-sessions">0</div></div>
+        <div class="stat-card"><div class="stat-label">Avg per Session</div><div class="stat-value" id="e-avg">₹0</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Hours/Session</div><div class="stat-value" id="e-hrs">0</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="section-title">By Pricing Plan</div><div id="e-byplan"></div></div>
+        <div class="card"><div class="section-title">Daily Breakdown</div><div id="e-daily"></div></div>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div id="page-export" class="page">
+      <div class="page-header"><h2>EXPORT DATA</h2><p>Download records and earnings as spreadsheet</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="section-title">📁 Export to Excel</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Choose what to include in your spreadsheet export.</p>
+          <div class="form-group" style="margin-bottom:14px">
+            <label>Date Range</label>
+            <select id="ex-range" onchange="document.getElementById('ex-custom').style.display=this.value==='custom'?'block':'none';renderExportPreview()">
+              <option value="all">All Records</option><option value="today">Today Only</option><option value="month">This Month</option><option value="custom">Custom Range</option>
+            </select>
+          </div>
+          <div id="ex-custom" style="display:none">
+            <div class="form-row">
+              <div class="form-group"><label>From</label><input type="date" id="ex-from"></div>
+              <div class="form-group"><label>To</label><input type="date" id="ex-to"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px"><input type="checkbox" id="ex-sessions" checked style="accent-color:var(--accent)"> Live Session Details Sheet</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px"><input type="checkbox" id="ex-records" checked style="accent-color:var(--accent)"> Manual Record Sheet</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px"><input type="checkbox" id="ex-earn" checked style="accent-color:var(--accent)"> Earnings Summary Sheet</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px"><input type="checkbox" id="ex-customer" checked style="accent-color:var(--accent)"> Customer List Sheet</label>
+          </div>
+          <button class="btn btn-green" onclick="exportExcel()" style="width:100%;padding:14px">⬇ Download Excel (.xlsx)</button>
+        </div>
+        <div class="card"><div class="section-title">📊 Preview</div><div id="export-preview"><p style="color:var(--muted);font-size:13px;text-align:center;padding:32px">Select options and click Download.</p></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- END SESSION MODAL -->
+<div class="modal-overlay" id="endModal">
+  <div class="modal">
+    <h3>🏁 End Session</h3>
+    <div id="end-details" style="color:var(--muted);font-size:14px;line-height:2"></div>
+    <div style="margin-top:14px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:150px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Payment Mode</label>
+        <select id="end-pay-mode" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;">
+          <option value="Cash">💵 Cash</option>
+          <option value="UPI">📲 UPI</option>
+          <option value="Card">💳 Card</option>
+          <option value="Online">🌐 Online</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:150px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Payment Status</label>
+        <select id="end-pay-status" style="width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;">
+          <option value="paid">✅ Paid</option>
+          <option value="unpaid">❌ Unpaid / Pending</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-green" onclick="confirmEnd()">✓ Confirm & Collect</button>
+      <button class="btn btn-outline" onclick="closeModal('endModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EARNINGS DETAIL MODAL -->
+<div class="modal-overlay" id="earnModal">
+  <div class="modal big-modal">
+    <h3 id="earn-modal-title">📊 Earnings Detail</h3>
+    <div class="modal-summary-grid" id="earn-modal-summary"></div>
+    <div class="section-title">All Sessions</div>
+    <div class="table-wrap" style="max-height:380px;overflow-y:auto">
+      <table>
+        <thead><tr><th>#</th><th>Customer</th><th>Phone</th><th>Station</th><th>Plan</th><th>Start</th><th>Duration</th><th>Amount</th><th>Source</th></tr></thead>
+        <tbody id="earn-modal-tbody"></tbody>
+      </table>
+      <p id="earn-modal-empty" style="color:var(--muted);text-align:center;padding:24px;display:none">No sessions for this period.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-green" onclick="exportModalData()" id="earn-modal-export">⬇ Export This</button>
+      <button class="btn btn-outline" onclick="closeModal('earnModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCOUNT SETTINGS MODAL -->
+<div class="modal-overlay" id="accountModal">
+  <div class="modal" style="width:460px;">
+    <h3>⚙ Account Settings</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">Update your login username or password.</p>
+    <div class="input-group">
+      <label>Current Password (required to save)</label>
+      <input type="password" id="acc-oldPass" placeholder="Enter current password">
+    </div>
+    <div style="height:1px;background:var(--border);margin:4px 0 16px;"></div>
+    <div class="input-group">
+      <label>New Username <span style="color:var(--muted);font-size:10px">(leave blank to keep same)</span></label>
+      <input type="text" id="acc-newUser" placeholder="New username">
+    </div>
+    <div class="input-group">
+      <label>New Password <span style="color:var(--muted);font-size:10px">(leave blank to keep same)</span></label>
+      <input type="password" id="acc-newPass" placeholder="New password">
+    </div>
+    <div class="input-group" style="margin-bottom:4px;">
+      <label>Confirm New Password</label>
+      <input type="password" id="acc-confirmPass" placeholder="Confirm new password">
+    </div>
+    <div class="error-msg" id="accErr" style="min-height:16px;font-size:13px;text-align:left;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-accent" onclick="doAccountUpdate()">💾 Save Changes</button>
+      <button class="btn btn-outline" onclick="closeModal('accountModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT CHECK MODAL -->
+<div class="modal-overlay" id="payCheckModal">
+  <div class="modal big-modal">
+    <h3>💳 Payment Status — Sessions After Hours</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:18px;">Sessions where hours have been completed. Check if payment is done or pending.</p>
+    <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+      <table>
+        <thead><tr><th>#</th><th>Customer</th><th>Station</th><th>Plan</th><th>Duration</th><th>Amount</th><th>Mode</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="paycheck-tbody"></tbody>
+      </table>
+      <p id="paycheck-empty" style="color:var(--muted);text-align:center;padding:24px;display:none">All sessions are paid! ✅</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('payCheckModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+// Credentials stored in localStorage so username/password updates persist
+function getCredentials(){
+  try{ const c=localStorage.getItem('gz_credentials'); if(c) return JSON.parse(c); } catch(e){}
+  return { admin:'admin123' };
+}
+function saveCredentials(obj){ try{ localStorage.setItem('gz_credentials',JSON.stringify(obj)); }catch(e){} }
+let currentUser = '';
+let activeSessions = [];
+let completedSessions = [];
+let manualRecords = [];   // Record Sheet entries
+let plans = [
+  {id:'p1',name:'Standard Hour',duration:1,price:30,extraRate:25,category:'PC Gaming',desc:'1 hr basic gaming'},
+  {id:'p2',name:'Double Hour',duration:2,price:55,extraRate:25,category:'PC Gaming',desc:'2 hr discount pack'},
+  {id:'p3',name:'Console Hour',duration:1,price:40,extraRate:35,category:'Console (PS/Xbox)',desc:'PS5 / Xbox gaming'},
+  {id:'p4',name:'VIP Premium',duration:1,price:60,extraRate:50,category:'VR Gaming',desc:'VR headset session'},
+];
+let endTargetId = null;
+let timerInterval = null;
+let sessionCounter = 100;
+let recordCounter = 1;
+let earnModalData = [];
+
+// ── AUTH ──
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  const creds=getCredentials();
+  if(creds[u]&&creds[u]===p){
+    currentUser=u;
+    document.getElementById('ownerName').textContent=u.charAt(0).toUpperCase()+u.slice(1);
+    document.getElementById('ownerAvatar').textContent=u.charAt(0).toUpperCase();
+    switchScreen('appScreen');
+    updateAll(); startTicker(); updateMonthlyBanner(); checkPaymentAlerts();
+  } else {
+    document.getElementById('loginErr').textContent='Invalid credentials. Try admin / admin123';
+  }
+}
+
+function toggleForgot(){
+  const card=document.getElementById('forgotCard');
+  card.classList.toggle('open');
+  document.getElementById('fpErr').textContent='';
+}
+
+function doResetCredentials(){
+  const oldUser=document.getElementById('fp-oldUser').value.trim();
+  const oldPass=document.getElementById('fp-oldPass').value;
+  const newUser=document.getElementById('fp-newUser').value.trim();
+  const newPass=document.getElementById('fp-newPass').value;
+  const confirm=document.getElementById('fp-confirmPass').value;
+  const err=document.getElementById('fpErr');
+  const creds=getCredentials();
+  if(!oldUser||!oldPass){ err.textContent='Enter current username and password.'; return; }
+  if(!creds[oldUser]||creds[oldUser]!==oldPass){ err.textContent='Current credentials are incorrect.'; return; }
+  if(!newPass){ err.textContent='Enter a new password.'; return; }
+  if(newPass!==confirm){ err.textContent='Passwords do not match.'; return; }
+  const targetUser=newUser||oldUser;
+  const updated={};
+  // Re-key with new username
+  Object.keys(creds).forEach(k=>{ if(k===oldUser) updated[targetUser]=newPass; else updated[k]=creds[k]; });
+  saveCredentials(updated);
+  err.style.color='var(--green)'; err.textContent='✓ Credentials updated! You can now log in with new details.';
+  setTimeout(()=>{ toggleForgot(); err.textContent=''; err.style.color=''; document.getElementById('fp-oldUser').value=''; document.getElementById('fp-oldPass').value=''; document.getElementById('fp-newUser').value=''; document.getElementById('fp-newPass').value=''; document.getElementById('fp-confirmPass').value=''; }, 1800);
+}
+
+function openAccountSettings(){
+  document.getElementById('acc-oldPass').value='';
+  document.getElementById('acc-newUser').value='';
+  document.getElementById('acc-newPass').value='';
+  document.getElementById('acc-confirmPass').value='';
+  document.getElementById('accErr').textContent='';
+  document.getElementById('accountModal').classList.add('open');
+}
+
+function doAccountUpdate(){
+  const oldPass=document.getElementById('acc-oldPass').value;
+  const newUser=document.getElementById('acc-newUser').value.trim();
+  const newPass=document.getElementById('acc-newPass').value;
+  const confirm=document.getElementById('acc-confirmPass').value;
+  const err=document.getElementById('accErr');
+  const creds=getCredentials();
+  if(!oldPass){ err.textContent='Enter your current password to confirm changes.'; return; }
+  if(!creds[currentUser]||creds[currentUser]!==oldPass){ err.textContent='Current password is incorrect.'; return; }
+  if(newPass&&newPass!==confirm){ err.textContent='New passwords do not match.'; return; }
+  const targetUser=newUser||currentUser;
+  const targetPass=newPass||creds[currentUser];
+  const updated={};
+  Object.keys(creds).forEach(k=>{ if(k===currentUser) updated[targetUser]=targetPass; else updated[k]=creds[k]; });
+  saveCredentials(updated);
+  currentUser=targetUser;
+  document.getElementById('ownerName').textContent=targetUser.charAt(0).toUpperCase()+targetUser.slice(1);
+  document.getElementById('ownerAvatar').textContent=targetUser.charAt(0).toUpperCase();
+  err.style.color='var(--green)'; err.textContent='✓ Account updated successfully!';
+  setTimeout(()=>{ closeModal('accountModal'); toast('Account updated!'); }, 1200);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.getElementById('loginScreen').classList.contains('active')) doLogin(); });
+function doLogout(){ switchScreen('loginScreen'); document.getElementById('loginPass').value=''; document.getElementById('loginErr').textContent=''; document.getElementById('forgotCard').classList.remove('open'); }
+function switchScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+// ── NAV ──
+function gotoPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(el) el.classList.add('active');
+  if(name==='history') renderHistory();
+  if(name==='earnings'){ setToday(); calcEarnings(); }
+  if(name==='pricing') renderPlans();
+  if(name==='sessions') renderSessionsFull();
+  if(name==='export') renderExportPreview();
+  if(name==='record'){ rcSetDefaults(); filterRecords(); }
+}
+
+// ── TICKER ──
+function startTicker(){
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    activeSessions.forEach(s=>{ s.elapsed=Math.floor((Date.now()-s.startTime)/1000); });
+    updateDashSessions(); renderSessionsFull(); updateStats();
+  },1000);
+}
+
+// ── PLANS ──
+function addPlan(){
+  const name=v('p-name'),dur=parseFloat(v('p-dur')),price=parseFloat(v('p-price')),
+    extra=parseFloat(v('p-extra'))||0,cat=v('p-cat'),desc=v('p-desc');
+  if(!name||isNaN(dur)||isNaN(price)){ toast('Fill required fields','red'); return; }
+  plans.push({id:'p'+Date.now(),name,duration:dur,price,extraRate:extra,category:cat,desc});
+  ['p-name','p-dur','p-price','p-extra','p-desc'].forEach(id=>{ document.getElementById(id).value=''; });
+  renderPlans(); refreshPlanSelect(); toast('Plan saved!');
+}
+function deletePlan(id){
+  if(activeSessions.find(s=>s.planId===id)){ toast('Plan is in use!','red'); return; }
+  plans=plans.filter(p=>p.id!==id); renderPlans(); refreshPlanSelect(); toast('Plan deleted','yellow');
+}
+function renderPlans(){
+  const el=document.getElementById('plans-list');
+  if(!plans.length){ el.innerHTML='<p style="color:var(--muted);font-size:13px">No plans yet.</p>'; return; }
+  el.innerHTML=plans.map(p=>`
+    <div class="pricing-tier">
+      <div>
+        <div class="tier-name">${p.name} <span class="badge badge-blue" style="font-size:10px">${p.category}</span></div>
+        <div class="tier-desc">${p.desc||''}</div>
+      </div>
+      <div style="text-align:center">
+        <div class="tier-rate">₹${p.price}</div>
+        <div style="font-size:11px;color:var(--muted)">for ${p.duration}hr${p.duration>1?'s':''}</div>
+        <div style="font-size:11px;color:var(--yellow)">+₹${p.extraRate}/hr extra</div>
+      </div>
+      <button class="btn btn-red" style="padding:6px 12px;font-size:12px" onclick="deletePlan('${p.id}')">✕</button>
+    </div>`).join('');
+}
+function refreshPlanSelect(){
+  ['qs-plan','rc-plan'].forEach(selId=>{
+    const sel=document.getElementById(selId);
+    if(!sel) return;
+    sel.innerHTML=plans.map(p=>`<option value="${p.id}">${p.name} — ₹${p.price}/${p.duration}hr</option>`).join('');
+  });
+}
+
+// ── LIVE SESSIONS ──
+function startSession(){
+  const name=v('qs-name').trim(),phone=v('qs-phone').trim(),planId=v('qs-plan'),station=v('qs-station').trim()||'—';
+  if(!name){ toast('Enter customer name','red'); return; }
+  if(!planId){ toast('Select a pricing plan','red'); return; }
+  const plan=plans.find(p=>p.id===planId);
+  activeSessions.push({id:'S'+(++sessionCounter),name,phone,station,planId,plan:plan.name,startTime:Date.now(),elapsed:0,category:plan.category});
+  ['qs-name','qs-phone','qs-station'].forEach(id=>{ document.getElementById(id).value=''; });
+  updateAll(); updateMonthlyBanner(); toast(`Session started for ${name}!`);
+}
+
+function calcCost(session){
+  const plan=plans.find(p=>p.id===session.planId);
+  if(!plan) return {cost:0,hrs:0,extra:0};
+  const hrs=session.elapsed/3600;
+  const extra=Math.max(0,hrs-plan.duration);
+  let cost=plan.price+(extra>0?extra*plan.extraRate:0);
+  return {cost:Math.round(cost*100)/100,hrs,extra};
+}
+function fmtTime(secs){ const h=Math.floor(secs/3600),m=Math.floor((secs%3600)/60),s=secs%60; return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+
+function updateDashSessions(){
+  const el=document.getElementById('dash-sessions');
+  if(!activeSessions.length){ el.innerHTML='<p style="color:var(--muted);font-size:14px;text-align:center;padding:20px">No active sessions.</p>'; return; }
+  el.innerHTML=activeSessions.slice(0,6).map(s=>{
+    const {cost,hrs}=calcCost(s);
+    const plan=plans.find(p=>p.id===s.planId)||{};
+    const pct=Math.min((s.elapsed/(plan.duration*3600))*100,100);
+    const over=s.elapsed>(plan.duration*3600);
+    return `<div class="session-card">
+      <div class="session-avatar">${s.name[0].toUpperCase()}</div>
+      <div class="session-info">
+        <h4>${s.name} <span class="badge badge-purple" style="font-size:10px">${s.station}</span></h4>
+        <p>${s.plan} · ${s.category}${s.phone?' · 📞 '+s.phone:''}</p>
+        <div class="timer-bar"><div class="timer-fill" style="width:${pct}%;background:${over?'var(--red)':'var(--green)'}"></div></div>
+      </div>
+      <div class="session-time">
+        <div class="time">${fmtTime(s.elapsed)}</div>
+        <div class="cost">₹${cost.toFixed(0)}</div>
+        ${over?'<div style="font-size:10px;color:var(--red)">OVERTIME</div>':''}
+        <div class="session-actions"><button class="btn btn-red" style="padding:5px 10px;font-size:12px" onclick="openEnd(\'${s.id}\')">End</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSessionsFull(){
+  const el=document.getElementById('sessions-list');
+  if(!activeSessions.length){ el.innerHTML='<p style="color:var(--muted);font-size:14px;text-align:center;padding:32px">No active sessions.</p>'; return; }
+  el.innerHTML=activeSessions.map(s=>{
+    const {cost,hrs}=calcCost(s);
+    const plan=plans.find(p=>p.id===s.planId)||{};
+    const pct=Math.min((s.elapsed/(plan.duration*3600))*100,100);
+    const over=s.elapsed>(plan.duration*3600);
+    return `<div class="session-card">
+      <div class="session-avatar">${s.name[0].toUpperCase()}</div>
+      <div class="session-info">
+        <h4>${s.name} <span class="badge ${over?'badge-red':'badge-green'}" style="font-size:10px">${over?'OVERTIME':'RUNNING'}</span></h4>
+        <p>${s.plan} · Station: <b>${s.station}</b>${s.phone?' · 📞 '+s.phone:''}</p>
+        <div style="display:flex;gap:16px;margin-top:4px;font-size:12px;color:var(--muted)">
+          <span>Started: ${new Date(s.startTime).toLocaleTimeString()}</span>
+          <span>Base: ${plan.duration}hr · ₹${plan.price}</span>
+          ${over?`<span style="color:var(--red)">Extra: ₹${plan.extraRate}/hr</span>`:''}
+        </div>
+        <div class="timer-bar" style="margin-top:8px"><div class="timer-fill" style="width:${pct}%;background:${over?'var(--red)':'var(--accent)'}"></div></div>
+      </div>
+      <div class="session-time">
+        <div class="time">${fmtTime(s.elapsed)}</div>
+        <div class="cost" style="font-size:16px;font-weight:700">₹${cost.toFixed(2)}</div>
+        <div class="session-actions" style="justify-content:flex-end">
+          <button class="btn btn-red" onclick="openEnd('${s.id}')">🏁 End Session</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// End session modal
+function openEnd(id){
+  endTargetId=id;
+  const s=activeSessions.find(x=>x.id===id);
+  const {cost,hrs,extra}=calcCost(s);
+  const plan=plans.find(p=>p.id===s.planId)||{};
+  document.getElementById('end-details').innerHTML=`
+    <b>Customer:</b> ${s.name} (${s.station})<br>
+    <b>Plan:</b> ${s.plan}<br>
+    <b>Duration:</b> ${fmtTime(s.elapsed)} (${hrs.toFixed(2)} hrs)<br>
+    ${extra>0?`<b>Overtime:</b> ${extra.toFixed(2)} hrs × ₹${plan.extraRate} = ₹${(extra*plan.extraRate).toFixed(2)}<br>`:''}
+    <b style="color:var(--green);font-size:18px">Total: ₹${cost.toFixed(2)}</b>`;
+  document.getElementById('endModal').classList.add('open');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function confirmEnd(){
+  const s=activeSessions.find(x=>x.id===endTargetId); if(!s){ closeModal('endModal'); return; }
+  const {cost,hrs}=calcCost(s);
+  const plan=plans.find(p=>p.id===s.planId)||{};
+  const payMode=document.getElementById('end-pay-mode').value;
+  const payStatus=document.getElementById('end-pay-status').value;
+  completedSessions.push({id:s.id,name:s.name,phone:s.phone,station:s.station,plan:s.plan,planId:s.planId,category:s.category,startTime:s.startTime,endTime:Date.now(),duration:hrs,cost:Math.round(cost*100)/100,paid:payStatus==='paid',payMode,source:'live'});
+  activeSessions=activeSessions.filter(x=>x.id!==endTargetId);
+  closeModal('endModal'); updateAll(); updateMonthlyBanner(); checkPaymentAlerts();
+  if(payStatus==='paid') toast(`₹${cost.toFixed(2)} collected from ${s.name}! (${payMode})`);
+  else toast(`Session ended for ${s.name}. Payment PENDING ₹${cost.toFixed(2)}`,'yellow');
+}
+
+// ══════════════════════════════════════════════
+//  RECORD SHEET
+// ══════════════════════════════════════════════
+function rcSetDefaults(){
+  const now=new Date();
+  document.getElementById('rc-date').value=now.toISOString().slice(0,10);
+  const hh=String(now.getHours()).padStart(2,'0'), mm=String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('rc-start').value=`${hh}:${mm}`;
+  document.getElementById('rc-end').value='';
+}
+
+function rcCalc(){
+  const planId=v('rc-plan'), start=v('rc-start'), end=v('rc-end');
+  const plan=plans.find(p=>p.id===planId);
+  const box=document.getElementById('rc-calc-box');
+  if(!plan||!start||!end){ box.style.display='none'; return; }
+
+  const [sh,sm]=start.split(':').map(Number);
+  const [eh,em]=end.split(':').map(Number);
+  let actualMins=(eh*60+em)-(sh*60+sm);
+  if(actualMins<=0) actualMins+=24*60;
+  const actualHrs=actualMins/60;
+  const overHrs=Math.max(0,actualHrs-plan.duration);
+  const baseCharge=plan.price;
+  const overCharge=overHrs>0?Math.round(overHrs*plan.extraRate*100)/100:0;
+  const total=baseCharge+overCharge;
+
+  box.style.display='block';
+  document.getElementById('rc-c-plan').textContent=plan.name;
+  document.getElementById('rc-c-dur').textContent=`${plan.duration} hr${plan.duration>1?'s':''} @ ₹${plan.price}`;
+  document.getElementById('rc-c-actual').textContent=`${actualHrs.toFixed(2)} hrs (${Math.floor(actualMins/60)}h ${actualMins%60}m)`;
+  document.getElementById('rc-c-over').textContent=overHrs>0?`${overHrs.toFixed(2)} hrs`:'None';
+  document.getElementById('rc-c-overcharge').textContent=overHrs>0?`₹${overCharge.toFixed(2)} (₹${plan.extraRate}/hr)`:'₹0';
+  document.getElementById('rc-c-total').textContent=`₹${total.toFixed(2)}`;
+  return {actualHrs, overHrs, baseCharge, overCharge, total};
+}
+
+function addRecord(){
+  const name=v('rc-name').trim(), phone=v('rc-phone').trim(),
+    station=v('rc-station').trim()||'—', date=v('rc-date'),
+    planId=v('rc-plan'), start=v('rc-start'), end=v('rc-end'),
+    pay=v('rc-pay'), notes=v('rc-notes'),
+    paidStatus=v('rc-paid-status');
+  if(!name||!planId||!start||!end||!date){ toast('Fill Name, Plan, Start & End Time','red'); return; }
+  const plan=plans.find(p=>p.id===planId);
+  const calc=rcCalc();
+  if(!calc){ toast('Invalid time range','red'); return; }
+  manualRecords.push({
+    id:'R'+(recordCounter++), name, phone, station, date,
+    planId, plan:plan.name, category:plan.category,
+    start, end,
+    actualHrs:calc.actualHrs, overHrs:calc.overHrs,
+    baseCharge:calc.baseCharge, overCharge:calc.overCharge, total:calc.total,
+    pay, paid:paidStatus!=='unpaid', notes, addedAt:Date.now()
+  });
+  rcReset(); filterRecords(); updateStats(); updateMonthlyBanner(); checkPaymentAlerts();
+  toast(`Record added: ₹${calc.total.toFixed(2)}`);
+}
+
+function rcReset(){
+  ['rc-name','rc-phone','rc-station','rc-notes','rc-end'].forEach(id=>{ document.getElementById(id).value=''; });
+  rcSetDefaults();
+  document.getElementById('rc-calc-box').style.display='none';
+}
+
+function deleteRecord(id){
+  manualRecords=manualRecords.filter(r=>r.id!==id);
+  filterRecords(); updateStats(); toast('Record deleted','yellow');
+}
+
+function filterRecords(){
+  const search=document.getElementById('rf-search')?.value.toLowerCase()||'';
+  const date=document.getElementById('rf-date')?.value||'';
+  let data=manualRecords.filter(r=>{
+    const ms=!search||r.name.toLowerCase().includes(search)||(r.phone&&r.phone.includes(search));
+    const md=!date||r.date===date;
+    return ms&&md;
+  });
+  renderRecords(data);
+}
+
+function renderRecords(data){
+  const tbody=document.getElementById('record-tbody');
+  const empty=document.getElementById('record-empty');
+  const shown=data||manualRecords;
+  if(!shown.length){ tbody.innerHTML=''; empty.style.display='block';
+    document.getElementById('rec-count').textContent='0';
+    document.getElementById('rec-hrs').textContent='0h';
+    document.getElementById('rec-total').textContent='₹0';
+    document.getElementById('rec-cash').textContent='₹0';
+    document.getElementById('rec-upi').textContent='₹0';
+    return;
+  }
+  empty.style.display='none';
+  const totalHrs=shown.reduce((a,r)=>a+r.actualHrs,0);
+  const totalAmt=shown.reduce((a,r)=>a+r.total,0);
+  const cashAmt=shown.filter(r=>r.pay==='Cash').reduce((a,r)=>a+r.total,0);
+  const upiAmt=shown.filter(r=>r.pay!=='Cash').reduce((a,r)=>a+r.total,0);
+  document.getElementById('rec-count').textContent=shown.length;
+  document.getElementById('rec-hrs').textContent=totalHrs.toFixed(1)+'h';
+  document.getElementById('rec-total').textContent='₹'+totalAmt.toFixed(2);
+  document.getElementById('rec-cash').textContent='₹'+cashAmt.toFixed(2);
+  document.getElementById('rec-upi').textContent='₹'+upiAmt.toFixed(2);
+
+  tbody.innerHTML=[...shown].reverse().map((r,i)=>`<tr>
+    <td>${shown.length-i}</td>
+    <td>${r.date}</td>
+    <td><b>${r.name}</b></td>
+    <td>${r.phone||'—'}</td>
+    <td>${r.station}</td>
+    <td><span class="badge badge-purple">${r.plan}</span></td>
+    <td>${r.start}</td>
+    <td>${r.end}</td>
+    <td>${r.actualHrs.toFixed(2)} hrs</td>
+    <td style="color:var(--text)">₹${r.baseCharge.toFixed(0)}</td>
+    <td style="color:${r.overCharge>0?'var(--yellow)':'var(--muted)'}">₹${r.overCharge.toFixed(2)}</td>
+    <td style="color:var(--green);font-weight:700">₹${r.total.toFixed(2)}</td>
+    <td><span class="badge ${r.pay==='Cash'?'badge-yellow':'badge-blue'}">${r.pay}</span></td>
+        <td id="pc-${r.id}">${r.paid!==false ? '<span class="badge badge-green"><span class="payment-status-dot dot-paid"></span>Paid</span>' : '<button class="btn btn-green" style="padding:4px 10px;font-size:11px;" onclick="markRecordPaid(\'' + r.id + '\')">✓ Paid</button>'}</td>
+    <td style="color:var(--muted);font-size:12px">${r.notes||'—'}</td>
+    <td><button class="btn btn-red" style="padding:4px 10px;font-size:11px" onclick="deleteRecord('${r.id}')">✕</button></td>
+  </tr>`).join('');
+}
+
+function exportRecords(){
+  const data=manualRecords;
+  if(!data.length){ toast('No records to export','red'); return; }
+  const wb=XLSX.utils.book_new();
+  const rows=data.map((r,i)=>({'#':i+1,'Date':r.date,'Customer':r.name,'Phone':r.phone||'—','Station':r.station,'Plan':r.plan,'Category':r.category,'Start':r.start,'End':r.end,'Duration (hrs)':r.actualHrs.toFixed(2),'Overtime (hrs)':r.overHrs.toFixed(2),'Base Charge (₹)':r.baseCharge.toFixed(2),'Overtime Charge (₹)':r.overCharge.toFixed(2),'Total (₹)':r.total.toFixed(2),'Payment':r.pay,'Notes':r.notes||''}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Record Sheet');
+  XLSX.writeFile(wb,`GameZone_Records_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Records exported!');
+}
+
+// ══════════════════════════════════════════════
+//  EARNINGS DETAIL MODAL (Today / Month)
+// ══════════════════════════════════════════════
+function openEarnModal(period){
+  const now=new Date();
+  const today=now.toISOString().slice(0,10);
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+
+  // Merge live sessions + manual records into one list for display
+  const livePart=completedSessions.filter(s=>{
+    const d=new Date(s.startTime).toISOString().slice(0,10);
+    return period==='today'?d===today:d>=monthStart&&d<=today;
+  }).map(s=>({...s,src:'Live',dateStr:new Date(s.startTime).toLocaleDateString('en-IN')}));
+
+  const recPart=manualRecords.filter(r=>period==='today'?r.date===today:r.date>=monthStart&&r.date<=today)
+    .map(r=>({name:r.name,phone:r.phone,station:r.station,plan:r.plan,duration:r.actualHrs,cost:r.total,src:'Manual',dateStr:r.date,start:r.start}));
+
+  earnModalData=[...livePart,...recPart];
+
+  const title=period==='today'?`📊 Today's Earnings — ${new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}`:`📊 Monthly Earnings — ${now.toLocaleDateString('en-IN',{month:'long',year:'numeric'})}`;
+  document.getElementById('earn-modal-title').textContent=title;
+
+  const total=earnModalData.reduce((a,s)=>a+s.cost,0);
+  const hrs=earnModalData.reduce((a,s)=>a+s.duration,0);
+  const liveCount=livePart.length, recCount=recPart.length;
+
+  document.getElementById('earn-modal-summary').innerHTML=`
+    <div class="mscard"><div class="ml">Total Earned</div><div class="mv" style="color:var(--green)">₹${total.toFixed(2)}</div></div>
+    <div class="mscard"><div class="ml">Sessions</div><div class="mv">${earnModalData.length}</div></div>
+    <div class="mscard"><div class="ml">Total Hours</div><div class="mv">${hrs.toFixed(1)}h</div></div>
+    <div class="mscard"><div class="ml">Live Sessions</div><div class="mv" style="color:var(--neon)">${liveCount}</div></div>
+    <div class="mscard"><div class="ml">Manual Records</div><div class="mv" style="color:var(--yellow)">${recCount}</div></div>
+    <div class="mscard"><div class="ml">Avg/Session</div><div class="mv">₹${earnModalData.length?(total/earnModalData.length).toFixed(0):0}</div></div>`;
+
+  const tbody=document.getElementById('earn-modal-tbody');
+  const empty=document.getElementById('earn-modal-empty');
+  if(!earnModalData.length){ tbody.innerHTML=''; empty.style.display='block'; }
+  else{
+    empty.style.display='none';
+    tbody.innerHTML=earnModalData.map((s,i)=>`<tr>
+      <td>${i+1}</td>
+      <td><b>${s.name}</b></td>
+      <td>${s.phone||'—'}</td>
+      <td>${s.station||'—'}</td>
+      <td><span class="badge badge-purple">${s.plan}</span></td>
+      <td>${s.dateStr}${s.start?' '+s.start:s.startTime?' '+new Date(s.startTime).toLocaleTimeString():''}</td>
+      <td>${s.duration.toFixed(2)} hrs</td>
+      <td style="color:var(--green);font-weight:700">₹${s.cost.toFixed(2)}</td>
+      <td><span class="badge ${s.src==='Live'?'badge-green':'badge-yellow'}">${s.src}</span></td>
+    </tr>`).join('');
+  }
+  document.getElementById('earnModal').classList.add('open');
+}
+
+function exportModalData(){
+  if(!earnModalData.length){ toast('No data','red'); return; }
+  const wb=XLSX.utils.book_new();
+  const rows=earnModalData.map((s,i)=>({'#':i+1,'Customer':s.name,'Phone':s.phone||'—','Station':s.station||'—','Plan':s.plan,'Date':s.dateStr,'Duration (hrs)':s.duration.toFixed(2),'Amount (₹)':s.cost.toFixed(2),'Source':s.src}));
+  const total=earnModalData.reduce((a,s)=>a+s.cost,0);
+  rows.push({'#':'TOTAL','Customer':'','Phone':'','Station':'','Plan':'','Date':'','Duration (hrs)':earnModalData.reduce((a,s)=>a+s.duration,0).toFixed(2),'Amount (₹)':total.toFixed(2),'Source':''});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Earnings Detail');
+  XLSX.writeFile(wb,`GameZone_Earnings_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Exported!');
+}
+
+// ── HISTORY ──
+function renderHistory(data){
+  const rows=data||completedSessions;
+  const tbody=document.getElementById('history-tbody');
+  const empty=document.getElementById('history-empty');
+  if(!rows.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  tbody.innerHTML=[...rows].reverse().map((s,i)=>{
+    const d=new Date(s.startTime),de=new Date(s.endTime);
+    return `<tr>
+      <td>${rows.length-i}</td><td><b>${s.name}</b></td><td>${s.phone||'—'}</td><td>${s.station}</td>
+      <td><span class="badge badge-purple">${s.plan}</span></td>
+      <td>${d.toLocaleDateString()} ${d.toLocaleTimeString()}</td>
+      <td>${de.toLocaleDateString()} ${de.toLocaleTimeString()}</td>
+      <td>${s.duration.toFixed(2)} hrs</td>
+      <td style="color:var(--green);font-weight:700">₹${s.cost.toFixed(2)}</td>
+            <td>${s.paid!==false ? '<span class="badge badge-green"><span class="payment-status-dot dot-paid"></span>Paid</span>' : '<button class="btn btn-green" style="padding:4px 10px;font-size:11px;" onclick="markLivePaid(\'' + s.id + '\');renderHistory()">✓ Paid</button>'}</td>
+    </tr>`;
+  }).join('');
+}
+function filterHistory(){
+  const search=v('h-search').toLowerCase(),date=v('h-date');
+  renderHistory(completedSessions.filter(s=>{
+    const ms=!search||s.name.toLowerCase().includes(search)||(s.phone&&s.phone.includes(search));
+    const md=!date||new Date(s.startTime).toISOString().slice(0,10)===date;
+    return ms&&md;
+  }));
+}
+function clearFilter(){ document.getElementById('h-date').value=''; document.getElementById('h-search').value=''; renderHistory(); }
+
+// ── EARNINGS PAGE ──
+function setToday(){ const t=new Date().toISOString().slice(0,10); document.getElementById('e-from').value=t; document.getElementById('e-to').value=t; }
+function setThisMonth(){ const n=new Date(); document.getElementById('e-from').value=new Date(n.getFullYear(),n.getMonth(),1).toISOString().slice(0,10); document.getElementById('e-to').value=n.toISOString().slice(0,10); }
+function calcEarnings(){
+  const from=v('e-from'),to=v('e-to');
+  const liveRows=completedSessions.filter(s=>{ const d=new Date(s.startTime).toISOString().slice(0,10); return(!from||d>=from)&&(!to||d<=to); });
+  const recRows=manualRecords.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to));
+  const allRows=[...liveRows.map(s=>({cost:s.cost,duration:s.duration,plan:s.plan,date:new Date(s.startTime).toISOString().slice(0,10)})),...recRows.map(r=>({cost:r.total,duration:r.actualHrs,plan:r.plan,date:r.date}))];
+  const total=allRows.reduce((a,s)=>a+s.cost,0);
+  const hrs=allRows.reduce((a,s)=>a+s.duration,0);
+  document.getElementById('e-total').textContent='₹'+total.toFixed(0);
+  document.getElementById('e-sessions').textContent=allRows.length;
+  document.getElementById('e-avg').textContent=allRows.length?'₹'+(total/allRows.length).toFixed(0):'₹0';
+  document.getElementById('e-hrs').textContent=allRows.length?(hrs/allRows.length).toFixed(1)+'h':'0';
+  const byPlan={};
+  allRows.forEach(s=>{ byPlan[s.plan]=(byPlan[s.plan]||{total:0,count:0}); byPlan[s.plan].total+=s.cost; byPlan[s.plan].count++; });
+  document.getElementById('e-byplan').innerHTML=Object.entries(byPlan).length?Object.entries(byPlan).map(([name,d])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:14px;font-weight:500">${name}</div><div style="font-size:12px;color:var(--muted)">${d.count} sessions</div></div>
+      <div style="color:var(--green);font-weight:700;font-family:'Orbitron',monospace">₹${d.total.toFixed(0)}</div>
+    </div>`).join(''):'<p style="color:var(--muted);font-size:13px">No data.</p>';
+  const byDay={};
+  allRows.forEach(s=>{ byDay[s.date]=(byDay[s.date]||0)+s.cost; });
+  document.getElementById('e-daily').innerHTML=Object.keys(byDay).length?Object.entries(byDay).sort().map(([d,amt])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px">${new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+      <div style="color:var(--green);font-weight:600">₹${amt.toFixed(0)}</div>
+    </div>`).join(''):'<p style="color:var(--muted);font-size:13px">No data.</p>';
+}
+
+// ── MARK RECORD PAID ──
+function markRecordPaid(id){
+  const r=manualRecords.find(x=>x.id===id);
+  if(r){ r.paid=true; filterRecords(); updateMonthlyBanner(); checkPaymentAlerts(); toast('Marked as Paid ✅'); }
+}
+
+// ── DASHBOARD REFRESH ──
+function dashRefresh(btn){
+  if(btn){ btn.classList.add('spinning'); setTimeout(()=>btn.classList.remove('spinning'),700); }
+  updateAll(); updateMonthlyBanner(); checkPaymentAlerts();
+  const now=new Date();
+  document.getElementById('dash-last-refresh').textContent='Refreshed at '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  toast('Dashboard refreshed!');
+}
+
+// ── MONTHLY BANNER ──
+function updateMonthlyBanner(){
+  const now=new Date();
+  const today=now.toISOString().slice(0,10);
+  const ms=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  const monthLive=completedSessions.filter(s=>{ const d=new Date(s.startTime).toISOString().slice(0,10); return d>=ms&&d<=today; });
+  const monthRec=manualRecords.filter(r=>r.date>=ms&&r.date<=today);
+  const total=monthLive.reduce((a,s)=>a+s.cost,0)+monthRec.reduce((a,r)=>a+r.total,0);
+  const sessions=monthLive.length+monthRec.length;
+  const cashAmt=monthLive.filter(s=>s.payMode==='Cash').reduce((a,s)=>a+s.cost,0)+monthRec.filter(r=>r.pay==='Cash').reduce((a,r)=>a+r.total,0);
+  const upiAmt=monthLive.filter(s=>s.payMode!=='Cash').reduce((a,s)=>a+s.cost,0)+monthRec.filter(r=>r.pay!=='Cash').reduce((a,r)=>a+r.total,0);
+  const monthName=now.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+
+  // Today's unique customers (daily reset)
+  const todayLive=completedSessions.filter(s=>new Date(s.startTime).toISOString().slice(0,10)===today);
+  const todayRec=manualRecords.filter(r=>r.date===today);
+  const todayCust=new Set([...todayLive.map(s=>s.phone||s.name),...todayRec.map(r=>r.phone||r.name)]);
+  // Monthly unique customers
+  const monthCust=new Set([...monthLive.map(s=>s.phone||s.name),...monthRec.map(r=>r.phone||r.name)]);
+
+  document.getElementById('mb-total').textContent='₹'+total.toFixed(0);
+  document.getElementById('mb-sessions').textContent=sessions;
+  document.getElementById('mb-cash').textContent='₹'+cashAmt.toFixed(0);
+  document.getElementById('mb-upi').textContent='₹'+upiAmt.toFixed(0);
+  document.getElementById('mb-avg').textContent=sessions?'₹'+(total/sessions).toFixed(0):'₹0';
+  document.getElementById('mb-today-cust').textContent=todayCust.size;
+  document.getElementById('mb-month-cust').textContent=monthCust.size;
+  document.getElementById('mb-month-label').textContent=monthName+' — '+sessions+' session'+(sessions!==1?'s':', ')+' · '+monthCust.size+' unique customer'+(monthCust.size!==1?'s':'');
+
+  // Build daily customer count breakdown for this month
+  const allMonthItems=[
+    ...monthLive.map(s=>({date:new Date(s.startTime).toISOString().slice(0,10),key:s.phone||s.name,earn:s.cost})),
+    ...monthRec.map(r=>({date:r.date,key:r.phone||r.name,earn:r.total}))
+  ];
+  // Group by date
+  const byDate={};
+  allMonthItems.forEach(x=>{
+    if(!byDate[x.date]) byDate[x.date]={customers:new Set(),earn:0,sessions:0};
+    byDate[x.date].customers.add(x.key);
+    byDate[x.date].earn+=x.earn;
+    byDate[x.date].sessions++;
+  });
+  const box=document.getElementById('mb-daily-customers-box');
+  const list=document.getElementById('mb-daily-customers-list');
+  const sortedDays=Object.keys(byDate).sort();
+  if(!sortedDays.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  list.innerHTML=sortedDays.map(d=>{
+    const isToday=d===today;
+    const dd=byDate[d];
+    const label=new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    return `<div style="background:${isToday?'rgba(59,130,246,.15)':'var(--surface2)'};border:1px solid ${isToday?'rgba(59,130,246,.4)':'var(--border)'};border-radius:8px;padding:10px 14px;min-width:120px;text-align:center;">
+      <div style="font-size:10px;color:${isToday?'var(--blue)':'var(--muted)'};font-weight:600;text-transform:uppercase;">${label}${isToday?' 📍':''}</div>
+      <div style="font-family:'Orbitron',monospace;font-size:20px;color:${isToday?'var(--blue)':'var(--text)'};">${dd.customers.size}</div>
+      <div style="font-size:10px;color:var(--muted);">customer${dd.customers.size!==1?'s':''}</div>
+      <div style="font-size:11px;color:var(--green);margin-top:2px;">₹${dd.earn.toFixed(0)}</div>
+      <div style="font-size:10px;color:var(--muted);">${dd.sessions} session${dd.sessions!==1?'s':''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── PAYMENT ALERTS (sessions where hours are done but payment pending) ──
+function checkPaymentAlerts(){
+  const box=document.getElementById('payment-alerts-box');
+  const list=document.getElementById('payment-alerts-list');
+  // Unpaid completed sessions (live)
+  const unpaidLive=completedSessions.filter(s=>s.paid===false);
+  // Unpaid manual records
+  const unpaidRec=manualRecords.filter(r=>r.paid===false);
+  const total=unpaidLive.length+unpaidRec.length;
+  if(!total){ box.style.display='none'; return; }
+  box.style.display='block';
+  let html='';
+  unpaidLive.forEach(s=>{
+    html+=`<div class="pay-alert">
+      <div class="pay-alert-info">
+        <b>⚠ ${s.name}</b> — <span>${s.station} · ${s.plan}</span><br>
+        <span style="font-size:12px;">Duration: ${s.duration.toFixed(2)} hrs · Amount: </span><b style="color:var(--red)">₹${s.cost.toFixed(2)}</b> <span style="font-size:11px;color:var(--muted)">· ${new Date(s.endTime).toLocaleDateString('en-IN')}</span>
+      </div>
+      <button class="btn btn-green" style="padding:6px 14px;font-size:12px;" onclick="markLivePaid('${s.id}')">Mark Paid ✓</button>
+    </div>`;
+  });
+  unpaidRec.forEach(r=>{
+    html+=`<div class="pay-alert">
+      <div class="pay-alert-info">
+        <b>⚠ ${r.name}</b> — <span>${r.station} · ${r.plan}</span><br>
+        <span style="font-size:12px;">Duration: ${r.actualHrs.toFixed(2)} hrs · Amount: </span><b style="color:var(--red)">₹${r.total.toFixed(2)}</b> <span style="font-size:11px;color:var(--muted)">· ${r.date}</span>
+      </div>
+      <button class="btn btn-green" style="padding:6px 14px;font-size:12px;" onclick="markRecordPaid('${r.id}')">Mark Paid ✓</button>
+    </div>`;
+  });
+  list.innerHTML=html;
+}
+
+function markLivePaid(id){
+  const s=completedSessions.find(x=>x.id===id);
+  if(s){ s.paid=true; updateAll(); updateMonthlyBanner(); checkPaymentAlerts(); toast('Payment marked as Paid ✅'); }
+}
+
+function openPayCheckModal(){
+  const tbody=document.getElementById('paycheck-tbody');
+  const empty=document.getElementById('paycheck-empty');
+  const unpaidLive=completedSessions.filter(s=>s.paid===false);
+  const unpaidRec=manualRecords.filter(r=>r.paid===false);
+  const all=[
+    ...unpaidLive.map(s=>({id:s.id,type:'live',name:s.name,station:s.station,plan:s.plan,duration:s.duration.toFixed(2)+' hrs',amount:s.cost,mode:s.payMode||'—',paid:false})),
+    ...unpaidRec.map(r=>({id:r.id,type:'rec',name:r.name,station:r.station,plan:r.plan,duration:r.actualHrs.toFixed(2)+' hrs',amount:r.total,mode:r.pay,paid:false}))
+  ];
+  if(!all.length){ tbody.innerHTML=''; empty.style.display='block'; }
+  else{
+    empty.style.display='none';
+    tbody.innerHTML=all.map((x,i)=>`<tr>
+      <td>${i+1}</td>
+      <td><b>${x.name}</b></td>
+      <td>${x.station}</td>
+      <td>${x.plan}</td>
+      <td>${x.duration}</td>
+      <td style="color:var(--red);font-weight:700">₹${x.amount.toFixed(2)}</td>
+      <td>${x.mode}</td>
+      <td><span class="badge badge-unpaid"><span class="payment-status-dot dot-unpaid"></span>Unpaid</span></td>
+      <td><button class="btn btn-green" style="padding:5px 12px;font-size:12px" onclick="${x.type==='live'?'markLivePaid':'markRecordPaid'}('${x.id}');openPayCheckModal()">Mark Paid</button></td>
+    </tr>`).join('');
+  }
+  document.getElementById('payCheckModal').classList.add('open');
+}
+
+// ── STATS ──
+function updateStats(){
+  document.getElementById('s-active').textContent=activeSessions.length;
+  const today=new Date().toISOString().slice(0,10);
+  const todayLive=completedSessions.filter(s=>new Date(s.startTime).toISOString().slice(0,10)===today);
+  const todayRec=manualRecords.filter(r=>r.date===today);
+  const todayEarn=todayLive.reduce((a,s)=>a+s.cost,0)+todayRec.reduce((a,r)=>a+r.total,0);
+  const todayCount=todayLive.length+todayRec.length;
+  document.getElementById('s-today').textContent='₹'+todayEarn.toFixed(0);
+  document.getElementById('s-today-count').textContent=todayCount+' sessions today';
+  const now=new Date(), ms=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10), me=today;
+  const monthLive=completedSessions.filter(s=>{ const d=new Date(s.startTime).toISOString().slice(0,10); return d>=ms&&d<=me; });
+  const monthRec=manualRecords.filter(r=>r.date>=ms&&r.date<=me);
+  const monthEarn=monthLive.reduce((a,s)=>a+s.cost,0)+monthRec.reduce((a,r)=>a+r.total,0);
+  document.getElementById('s-month').textContent='₹'+monthEarn.toFixed(0);
+  document.getElementById('s-month-count').textContent=(monthLive.length+monthRec.length)+' this month';
+  // Today's unique customers — resets daily at midnight automatically
+  const todayNames=new Set([
+    ...todayLive.map(s=>s.phone||s.name),
+    ...todayRec.map(r=>r.phone||r.name)
+  ]);
+  document.getElementById('s-customers').textContent=todayNames.size;
+  // Monthly unique customers for sub-label
+  const monthNames=new Set([...monthLive.map(s=>s.phone||s.name),...monthRec.map(r=>r.phone||r.name)]);
+  document.getElementById('s-customers-sub').textContent=monthNames.size+' unique this month';
+}
+
+// ── EXPORT ──
+function getFilteredForExport(){
+  const range=v('ex-range'),from=v('ex-from'),to=v('ex-to'),today=new Date().toISOString().slice(0,10);
+  const n=new Date(), ms=new Date(n.getFullYear(),n.getMonth(),1).toISOString().slice(0,10);
+  return {
+    live:completedSessions.filter(s=>{ const d=new Date(s.startTime).toISOString().slice(0,10); if(range==='today')return d===today; if(range==='month')return d>=ms&&d<=today; if(range==='custom')return(!from||d>=from)&&(!to||d<=to); return true; }),
+    rec:manualRecords.filter(r=>{ if(range==='today')return r.date===today; if(range==='month')return r.date>=ms&&r.date<=today; if(range==='custom')return(!from||r.date>=from)&&(!to||r.date<=to); return true; })
+  };
+}
+function renderExportPreview(){
+  const {live,rec}=getFilteredForExport();
+  const el=document.getElementById('export-preview');
+  const total=live.reduce((a,s)=>a+s.cost,0)+rec.reduce((a,r)=>a+r.total,0);
+  el.innerHTML=`
+    <div class="card-sm" style="margin-bottom:12px"><div style="color:var(--muted);font-size:12px">Live Sessions</div><div style="font-family:'Orbitron',monospace;font-size:22px;margin-top:4px">${live.length}</div></div>
+    <div class="card-sm" style="margin-bottom:12px"><div style="color:var(--muted);font-size:12px">Manual Records</div><div style="font-family:'Orbitron',monospace;font-size:22px;margin-top:4px">${rec.length}</div></div>
+    <div class="card-sm" style="margin-bottom:12px"><div style="color:var(--muted);font-size:12px">Total Amount</div><div style="font-family:'Orbitron',monospace;font-size:22px;color:var(--green);margin-top:4px">₹${total.toFixed(2)}</div></div>`;
+}
+function exportExcel(){
+  const {live,rec}=getFilteredForExport();
+  if(!live.length&&!rec.length){ toast('No data to export','red'); return; }
+  const wb=XLSX.utils.book_new();
+  if(document.getElementById('ex-sessions').checked&&live.length){
+    const rows=live.map((s,i)=>({'S.No':i+1,'Session ID':s.id,'Customer':s.name,'Phone':s.phone||'—','Station':s.station,'Plan':s.plan,'Category':s.category,'Start':new Date(s.startTime).toLocaleString(),'End':new Date(s.endTime).toLocaleString(),'Duration (hrs)':s.duration.toFixed(2),'Amount (₹)':s.cost.toFixed(2),'Source':'Live'}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Live Sessions');
+  }
+  if(document.getElementById('ex-records').checked&&rec.length){
+    const rows=rec.map((r,i)=>({'#':i+1,'Date':r.date,'Customer':r.name,'Phone':r.phone||'—','Station':r.station,'Plan':r.plan,'Start':r.start,'End':r.end,'Duration (hrs)':r.actualHrs.toFixed(2),'Overtime (hrs)':r.overHrs.toFixed(2),'Base ₹':r.baseCharge.toFixed(2),'Overtime ₹':r.overCharge.toFixed(2),'Total ₹':r.total.toFixed(2),'Payment':r.pay,'Notes':r.notes||''}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Record Sheet');
+  }
+  if(document.getElementById('ex-earn').checked){
+    const all=[...live.map(s=>({cost:s.cost,dur:s.duration,plan:s.plan,date:new Date(s.startTime).toISOString().slice(0,10)})),...rec.map(r=>({cost:r.total,dur:r.actualHrs,plan:r.plan,date:r.date}))];
+    const byDay={};
+    all.forEach(x=>{ byDay[x.date]=(byDay[x.date]||{sessions:0,total:0,hrs:0}); byDay[x.date].sessions++; byDay[x.date].total+=x.cost; byDay[x.date].hrs+=x.dur; });
+    const earnRows=Object.entries(byDay).sort().map(([d,dv])=>({'Date':d,'Sessions':dv.sessions,'Total Hours':dv.hrs.toFixed(2),'Total Earnings (₹)':dv.total.toFixed(2),'Avg/Session':(dv.total/dv.sessions).toFixed(2)}));
+    earnRows.push({'Date':'GRAND TOTAL','Sessions':all.length,'Total Hours':all.reduce((a,x)=>a+x.dur,0).toFixed(2),'Total Earnings (₹)':all.reduce((a,x)=>a+x.cost,0).toFixed(2),'Avg/Session':all.length?(all.reduce((a,x)=>a+x.cost,0)/all.length).toFixed(2):'0'});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(earnRows),'Earnings Summary');
+  }
+  if(document.getElementById('ex-customer').checked){
+    const all=[...completedSessions,...manualRecords.map(r=>({name:r.name,phone:r.phone,cost:r.total,plan:r.plan}))];
+    const cm={};
+    all.forEach(s=>{ const k=s.phone||s.name; if(!cm[k]) cm[k]={name:s.name,phone:s.phone||'—',visits:0,total:0}; cm[k].visits++; cm[k].total+=s.cost||s.total||0; });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.values(cm).sort((a,b)=>b.total-a.total).map((c,i)=>({'#':i+1,'Customer':c.name,'Phone':c.phone,'Total Visits':c.visits,'Total Spent (₹)':c.total.toFixed(2)}))),'Customers');
+  }
+  XLSX.writeFile(wb,`GameZone_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel downloaded!');
+}
+
+// ── UTILS ──
+function v(id){ return document.getElementById(id)?.value||''; }
+function toast(msg,type='green'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.borderColor=type==='red'?'var(--red)':type==='yellow'?'var(--yellow)':'var(--green)';
+  el.style.color=type==='red'?'var(--red)':type==='yellow'?'var(--yellow)':'var(--green)';
+  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2800);
+}
+function updateAll(){ updateStats(); updateDashSessions(); renderSessionsFull(); }
+
+// ── INIT ──
+(function init(){
+  refreshPlanSelect(); renderPlans();
+  completedSessions=[];
+  manualRecords=[];
+  activeSessions=[];
+  recordCounter=1;
+  sessionCounter=100;
+  updateAll(); updateMonthlyBanner(); checkPaymentAlerts();
+  const n=new Date();
+  document.getElementById('dash-last-refresh').textContent='Loaded at '+n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+})();
+</script>
+</body>
+</html>
